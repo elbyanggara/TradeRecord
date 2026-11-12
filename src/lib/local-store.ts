@@ -18,10 +18,33 @@ export interface LocalIntegrationToken {
   createdAt: string;
 }
 
+export interface LocalSubscriptionRecord {
+  userId: string;
+  plan: "free" | "pro";
+  status: "inactive" | "active" | "expired";
+  proUntil: string | null;
+  lastOrderId: string | null;
+  updatedAt: string;
+}
+
+export interface LocalPaymentOrderRecord {
+  orderId: string;
+  userId: string;
+  plan: "pro";
+  amountIdr: number;
+  status: "pending" | "paid" | "failed" | "expired";
+  snapToken: string | null;
+  snapRedirectUrl: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
 interface LocalStoreData {
   users: LocalUserRecord[];
   journals: JournalEntry[];
   tokens: LocalIntegrationToken[];
+  subscriptions: LocalSubscriptionRecord[];
+  paymentOrders: LocalPaymentOrderRecord[];
 }
 
 const STORE_DIR = path.join(process.cwd(), ".local-data");
@@ -37,9 +60,21 @@ async function readStore(): Promise<LocalStoreData> {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       journals: Array.isArray(parsed.journals) ? parsed.journals : [],
       tokens: Array.isArray(parsed.tokens) ? parsed.tokens : [],
+      subscriptions: Array.isArray(parsed.subscriptions)
+        ? parsed.subscriptions
+        : [],
+      paymentOrders: Array.isArray(parsed.paymentOrders)
+        ? parsed.paymentOrders
+        : [],
     };
   } catch {
-    return { users: [], journals: [], tokens: [] };
+    return {
+      users: [],
+      journals: [],
+      tokens: [],
+      subscriptions: [],
+      paymentOrders: [],
+    };
   }
 }
 
@@ -140,6 +175,8 @@ export async function deleteLocalUser(userId: string): Promise<void> {
     store.users = store.users.filter((u) => u.id !== userId);
     store.journals = store.journals.filter((j) => j.user_id !== userId);
     store.tokens = store.tokens.filter((t) => t.userId !== userId);
+    store.subscriptions = store.subscriptions.filter((s) => s.userId !== userId);
+    store.paymentOrders = store.paymentOrders.filter((o) => o.userId !== userId);
     await writeStore(store);
   });
 }
@@ -280,6 +317,15 @@ export async function ingestLocalMt5Trade(
       throw new Error("Invalid API token");
     }
 
+    const sub = store.subscriptions.find((s) => s.userId === tokenRecord.userId);
+    const isSubActive =
+      sub?.plan === "pro" &&
+      sub.status === "active" &&
+      (!sub.proUntil || new Date(sub.proUntil).getTime() > Date.now());
+    if (!isSubActive) {
+      throw new Error("Pro subscription required");
+    }
+
     tokenRecord.lastUsedAt = new Date().toISOString();
 
     if (payload.external_id) {
@@ -303,5 +349,96 @@ export async function ingestLocalMt5Trade(
     store.journals.push(created);
     await writeStore(store);
     return { status: "created", id: created.id };
+  });
+}
+
+export async function getLocalSubscription(
+  userId: string
+): Promise<LocalSubscriptionRecord | null> {
+  const store = await readStore();
+  return store.subscriptions.find((s) => s.userId === userId) ?? null;
+}
+
+export async function listLocalPaymentOrders(
+  userId: string
+): Promise<LocalPaymentOrderRecord[]> {
+  const store = await readStore();
+  return store.paymentOrders
+    .filter((o) => o.userId === userId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function createLocalPaymentOrder(
+  record: LocalPaymentOrderRecord
+): Promise<void> {
+  return withStoreLock(async () => {
+    const store = await readStore();
+    store.paymentOrders.push(record);
+    await writeStore(store);
+  });
+}
+
+export async function getLocalPaymentOrder(
+  orderId: string
+): Promise<LocalPaymentOrderRecord | null> {
+  const store = await readStore();
+  return store.paymentOrders.find((o) => o.orderId === orderId) ?? null;
+}
+
+export async function activateLocalProFromOrder(
+  orderId: string,
+  durationDays: number
+): Promise<LocalSubscriptionRecord | null> {
+  return withStoreLock(async () => {
+    const store = await readStore();
+    const order = store.paymentOrders.find((o) => o.orderId === orderId);
+    if (!order) return null;
+
+    const now = new Date();
+    if (order.status !== "paid") {
+      order.status = "paid";
+      order.paidAt = now.toISOString();
+    }
+
+    const existing = store.subscriptions.find((s) => s.userId === order.userId);
+    const baseTime =
+      existing?.proUntil && new Date(existing.proUntil).getTime() > now.getTime()
+        ? new Date(existing.proUntil).getTime()
+        : now.getTime();
+    const nextUntil = new Date(
+      baseTime + durationDays * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const updated: LocalSubscriptionRecord = {
+      userId: order.userId,
+      plan: "pro",
+      status: "active",
+      proUntil: nextUntil,
+      lastOrderId: orderId,
+      updatedAt: now.toISOString(),
+    };
+
+    const idx = store.subscriptions.findIndex((s) => s.userId === order.userId);
+    if (idx >= 0) {
+      store.subscriptions[idx] = updated;
+    } else {
+      store.subscriptions.push(updated);
+    }
+
+    await writeStore(store);
+    return updated;
+  });
+}
+
+export async function updateLocalPaymentOrderStatus(
+  orderId: string,
+  status: "pending" | "paid" | "failed" | "expired"
+): Promise<void> {
+  return withStoreLock(async () => {
+    const store = await readStore();
+    const order = store.paymentOrders.find((o) => o.orderId === orderId);
+    if (!order) return;
+    order.status = status;
+    await writeStore(store);
   });
 }

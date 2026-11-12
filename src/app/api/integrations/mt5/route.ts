@@ -139,7 +139,12 @@ export async function POST(request: Request) {
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Token tidak valid.";
-        const status = message === "Invalid API token" ? 401 : 400;
+        const status =
+          message === "Invalid API token"
+            ? 401
+            : message === "Pro subscription required"
+              ? 403
+              : 400;
         return NextResponse.json({ error: message }, { status });
       }
     }
@@ -166,7 +171,11 @@ export async function POST(request: Request) {
 
     if (error) {
       const msg = error.message || "Gagal memproses webhook MT5.";
-      const status = msg.includes("Invalid API token") ? 401 : 400;
+      const status = msg.includes("Invalid API token")
+        ? 401
+        : msg.includes("Pro subscription required")
+          ? 403
+          : 400;
       return NextResponse.json({ error: msg }, { status });
     }
 

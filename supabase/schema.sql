@@ -59,6 +59,46 @@ create policy "own_tokens" on public.integration_tokens
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- 4b. Tabel langganan Pro (dibaca user, ditulis hanya oleh server setelah pembayaran valid)
+create table if not exists public.user_subscriptions (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  plan text not null default 'free' check (plan in ('free', 'pro')),
+  status text not null default 'inactive' check (status in ('inactive', 'active', 'expired')),
+  pro_until timestamptz,
+  last_order_id text,
+  updated_at timestamptz default now()
+);
+
+alter table public.user_subscriptions enable row level security;
+
+drop policy if exists "read_own_subscription" on public.user_subscriptions;
+create policy "read_own_subscription" on public.user_subscriptions
+  for select
+  using (auth.uid() = user_id);
+
+-- 4c. Tabel order pembayaran Midtrans
+create table if not exists public.payment_orders (
+  order_id text primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  plan text not null default 'pro',
+  amount_idr integer not null,
+  status text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'expired')),
+  snap_token text,
+  snap_redirect_url text,
+  paid_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create index if not exists payment_orders_user_created_idx
+  on public.payment_orders (user_id, created_at desc);
+
+alter table public.payment_orders enable row level security;
+
+drop policy if exists "read_own_payment_orders" on public.payment_orders;
+create policy "read_own_payment_orders" on public.payment_orders
+  for select
+  using (auth.uid() = user_id);
+
 -- 5. RPC untuk menerima webhook trade dari MT5 / EA dengan token API
 create or replace function public.ingest_mt5_trade(
   p_raw_token text,
@@ -98,6 +138,17 @@ begin
 
   if v_user_id is null then
     raise exception 'Invalid API token';
+  end if;
+
+  if not exists (
+    select 1
+    from public.user_subscriptions
+    where user_id = v_user_id
+      and plan = 'pro'
+      and status = 'active'
+      and (pro_until is null or pro_until > now())
+  ) then
+    raise exception 'Pro subscription required';
   end if;
 
   update public.integration_tokens

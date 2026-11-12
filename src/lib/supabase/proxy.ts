@@ -6,7 +6,13 @@ import {
 } from "@/lib/local-auth-token";
 import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/supabase/env";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/journal", "/calendar", "/profile"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/journal",
+  "/calendar",
+  "/mt5",
+  "/profile",
+];
 const AUTH_PAGES = ["/login", "/register"];
 
 function isProtectedPath(pathname: string): boolean {

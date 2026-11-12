@@ -1,39 +1,18 @@
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import {
-  LOCAL_SESSION_COOKIE,
-  verifyLocalSession,
-} from "@/lib/local-auth-token";
 import {
   deleteLocalIntegrationToken,
   getLocalIntegrationToken,
   hashApiToken,
   upsertLocalIntegrationToken,
 } from "@/lib/local-store";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
-
-async function resolveSessionUser() {
-  if (!isSupabaseConfigured()) {
-    const cookieStore = await cookies();
-    const token = cookieStore.get(LOCAL_SESSION_COOKIE)?.value;
-    const session = await verifyLocalSession(token);
-    if (!session) return null;
-    return { mode: "local" as const, userId: session.userId };
-  }
-
-  const supabase = await createClient();
-  if (!supabase) return null;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  return { mode: "supabase" as const, userId: user.id, supabase };
-}
+import {
+  getUserSubscriptionSummary,
+  resolveApiSessionUser,
+} from "@/lib/subscription";
 
 export async function GET() {
-  const ctx = await resolveSessionUser();
+  const ctx = await resolveApiSessionUser();
   if (!ctx) {
     return NextResponse.json({ error: "Tidak terautentikasi." }, { status: 401 });
   }
@@ -48,7 +27,7 @@ export async function GET() {
     });
   }
 
-  const { data, error } = await ctx.supabase
+  const { data, error } = await ctx.supabase!
     .from("integration_tokens")
     .select("token_prefix, created_at, last_used_at")
     .eq("user_id", ctx.userId)
@@ -73,9 +52,20 @@ export async function GET() {
 }
 
 export async function POST() {
-  const ctx = await resolveSessionUser();
+  const ctx = await resolveApiSessionUser();
   if (!ctx) {
     return NextResponse.json({ error: "Tidak terautentikasi." }, { status: 401 });
+  }
+
+  const sub = await getUserSubscriptionSummary(ctx);
+  if (!sub.isPro) {
+    return NextResponse.json(
+      {
+        error:
+          "Akses Auto-Sync MT5 khusus pengguna Paket Pro. Silakan selesaikan pembayaran di menu MT5 Sync.",
+      },
+      { status: 403 }
+    );
   }
 
   const rawToken = `pnld_${crypto.randomBytes(24).toString("hex")}`;
@@ -96,7 +86,7 @@ export async function POST() {
     });
   }
 
-  const { data, error } = await ctx.supabase
+  const { data, error } = await ctx.supabase!
     .from("integration_tokens")
     .upsert(
       {
@@ -130,7 +120,7 @@ export async function POST() {
 }
 
 export async function DELETE() {
-  const ctx = await resolveSessionUser();
+  const ctx = await resolveApiSessionUser();
   if (!ctx) {
     return NextResponse.json({ error: "Tidak terautentikasi." }, { status: 401 });
   }
@@ -140,7 +130,7 @@ export async function DELETE() {
     return NextResponse.json({ success: true });
   }
 
-  const { error } = await ctx.supabase
+  const { error } = await ctx.supabase!
     .from("integration_tokens")
     .delete()
     .eq("user_id", ctx.userId);
@@ -151,4 +141,3 @@ export async function DELETE() {
 
   return NextResponse.json({ success: true });
 }
-

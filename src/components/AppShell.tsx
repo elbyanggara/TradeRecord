@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookText,
+  Bot,
   CalendarDays,
   LayoutDashboard,
   LogOut,
@@ -13,7 +14,6 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useToast } from "@/components/ToastProvider";
-import { formatAccountLabel } from "@/lib/mt5-account";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/journal", label: "Jurnal", icon: BookText },
   { href: "/calendar", label: "Kalender", icon: CalendarDays },
+  { href: "/mt5", label: "MT5 Sync", icon: Bot },
   { href: "/profile", label: "Profil", icon: UserCircle2 },
 ] as const;
 
@@ -111,7 +112,7 @@ export function AppShell({ userEmail, children, onQuickAdd }: AppShellProps) {
               Akun Aktif
             </p>
             <p className="mt-0.5 truncate text-xs font-semibold text-[#111827]">
-              {formatAccountLabel(userEmail)}
+              {userEmail}
             </p>
           </div>
           <button
@@ -158,7 +159,7 @@ export function AppShell({ userEmail, children, onQuickAdd }: AppShellProps) {
       {/* Mobile Bottom Nav */}
       <nav
         aria-label="Navigasi mobile"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-slate-200 bg-white/95 pb-safe backdrop-blur-sm md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 pb-safe backdrop-blur-sm md:hidden"
       >
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
