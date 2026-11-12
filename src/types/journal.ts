@@ -15,6 +15,7 @@ export interface JournalEntry {
   pnl_nominal: number;
   pnl_persen: number | null;
   catatan: string | null;
+  external_id?: string | null;
   created_at: string;
 }
 
@@ -29,6 +30,7 @@ export interface JournalPayload {
   pnl_nominal: number;
   pnl_persen: number | null;
   catatan: string | null;
+  external_id?: string | null;
 }
 
 export interface JournalFilters {
@@ -37,4 +39,3 @@ export interface JournalFilters {
   akun: "all" | AccountType;
   hasil: OutcomeFilter;
 }
-

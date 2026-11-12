@@ -12,6 +12,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { Mt5IntegrationCard } from "@/components/profile/Mt5IntegrationCard";
 import { useToast } from "@/components/ToastProvider";
 import { useJournals } from "@/hooks/useJournals";
 import { downloadJournalsCsv } from "@/lib/csv";
@@ -155,6 +156,9 @@ export function ProfileClient({
             </button>
           </div>
         </div>
+
+        {/* Auto-Sync MT5 / EA */}
+        <Mt5IntegrationCard />
 
         {/* PWA Install */}
         <InstallPrompt />

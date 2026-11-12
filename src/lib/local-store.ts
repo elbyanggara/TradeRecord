@@ -10,9 +10,18 @@ export interface LocalUserRecord {
   createdAt: string;
 }
 
+export interface LocalIntegrationToken {
+  userId: string;
+  tokenHash: string;
+  tokenPrefix: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
 interface LocalStoreData {
   users: LocalUserRecord[];
   journals: JournalEntry[];
+  tokens: LocalIntegrationToken[];
 }
 
 const STORE_DIR = path.join(process.cwd(), ".local-data");
@@ -27,9 +36,10 @@ async function readStore(): Promise<LocalStoreData> {
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       journals: Array.isArray(parsed.journals) ? parsed.journals : [],
+      tokens: Array.isArray(parsed.tokens) ? parsed.tokens : [],
     };
   } catch {
-    return { users: [], journals: [] };
+    return { users: [], journals: [], tokens: [] };
   }
 }
 
@@ -65,6 +75,10 @@ function verifyPassword(password: string, storedHash: string): boolean {
   const expected = Buffer.from(hexHash, "hex");
   if (derived.length !== expected.length) return false;
   return crypto.timingSafeEqual(derived, expected);
+}
+
+export function hashApiToken(rawToken: string): string {
+  return crypto.createHash("sha256").update(rawToken.trim(), "utf8").digest("hex");
 }
 
 export async function registerLocalUser(
@@ -125,6 +139,7 @@ export async function deleteLocalUser(userId: string): Promise<void> {
     const store = await readStore();
     store.users = store.users.filter((u) => u.id !== userId);
     store.journals = store.journals.filter((j) => j.user_id !== userId);
+    store.tokens = store.tokens.filter((t) => t.userId !== userId);
     await writeStore(store);
   });
 }
@@ -197,3 +212,96 @@ export async function deleteLocalJournal(
   });
 }
 
+export async function getLocalIntegrationToken(
+  userId: string
+): Promise<Omit<LocalIntegrationToken, "tokenHash"> | null> {
+  const store = await readStore();
+  const found = store.tokens.find((t) => t.userId === userId);
+  if (!found) return null;
+  return {
+    userId: found.userId,
+    tokenPrefix: found.tokenPrefix,
+    lastUsedAt: found.lastUsedAt,
+    createdAt: found.createdAt,
+  };
+}
+
+export async function upsertLocalIntegrationToken(
+  userId: string,
+  rawToken: string,
+  tokenPrefix: string
+): Promise<Omit<LocalIntegrationToken, "tokenHash">> {
+  const tokenHash = hashApiToken(rawToken);
+  return withStoreLock(async () => {
+    const store = await readStore();
+    const now = new Date().toISOString();
+    const nextRecord: LocalIntegrationToken = {
+      userId,
+      tokenHash,
+      tokenPrefix,
+      lastUsedAt: null,
+      createdAt: now,
+    };
+    const idx = store.tokens.findIndex((t) => t.userId === userId);
+    if (idx >= 0) {
+      store.tokens[idx] = nextRecord;
+    } else {
+      store.tokens.push(nextRecord);
+    }
+    await writeStore(store);
+    return {
+      userId,
+      tokenPrefix,
+      lastUsedAt: null,
+      createdAt: now,
+    };
+  });
+}
+
+export async function deleteLocalIntegrationToken(
+  userId: string
+): Promise<void> {
+  return withStoreLock(async () => {
+    const store = await readStore();
+    store.tokens = store.tokens.filter((t) => t.userId !== userId);
+    await writeStore(store);
+  });
+}
+
+export async function ingestLocalMt5Trade(
+  rawToken: string,
+  payload: JournalPayload
+): Promise<{ status: "created" | "duplicate"; id: string }> {
+  const tokenHash = hashApiToken(rawToken);
+  return withStoreLock(async () => {
+    const store = await readStore();
+    const tokenRecord = store.tokens.find((t) => t.tokenHash === tokenHash);
+    if (!tokenRecord) {
+      throw new Error("Invalid API token");
+    }
+
+    tokenRecord.lastUsedAt = new Date().toISOString();
+
+    if (payload.external_id) {
+      const duplicate = store.journals.find(
+        (j) =>
+          j.user_id === tokenRecord.userId &&
+          j.external_id === payload.external_id
+      );
+      if (duplicate) {
+        await writeStore(store);
+        return { status: "duplicate", id: duplicate.id };
+      }
+    }
+
+    const created: JournalEntry = {
+      id: crypto.randomUUID(),
+      user_id: tokenRecord.userId,
+      ...payload,
+      created_at: new Date().toISOString(),
+    };
+    store.journals.push(created);
+    await writeStore(store);
+    return { status: "created", id: created.id };
+  });
+}
