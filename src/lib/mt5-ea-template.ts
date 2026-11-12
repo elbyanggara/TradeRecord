@@ -1,17 +1,47 @@
-//+------------------------------------------------------------------+
+const DEFAULT_WEBHOOK_URL = "https://pnl-diary.vercel.app/api/integrations/mt5";
+
+function escapeMqlString(value: string): string {
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replaceAll("\r", "")
+    .replaceAll("\n", "");
+}
+
+export interface Mt5EaTemplateOptions {
+  webhookUrl?: string;
+  apiKey?: string;
+  appOrigin?: string;
+}
+
+/**
+ * Generates PnLDiarySync.mq5 source code with Webhook URL and API Key pre-filled
+ * so public users only need to compile and attach the EA without manual copy-paste.
+ */
+export function buildMt5EaSource(options: Mt5EaTemplateOptions = {}): string {
+  const cleanWebhookUrl = escapeMqlString(
+    options.webhookUrl?.trim() || DEFAULT_WEBHOOK_URL
+  );
+  const cleanApiKey = escapeMqlString(options.apiKey?.trim() || "");
+  const derivedOrigin =
+    options.appOrigin?.trim() ||
+    cleanWebhookUrl.replace(/\/api\/integrations\/mt5\/?$/, "");
+  const cleanOrigin = escapeMqlString(derivedOrigin || "https://pnl-diary.vercel.app");
+
+  return `//+------------------------------------------------------------------+
 //|                                               PnLDiarySync.mq5   |
 //|                                    PnL Diary — Auto-Sync EA MT5  |
-//|                                    https://pnl-diary.vercel.app  |
+//|                                    ${cleanOrigin}  |
 //+------------------------------------------------------------------+
 #property copyright "PnL Diary"
-#property link      "https://pnl-diary.vercel.app"
-#property version   "1.00"
+#property link      "${cleanOrigin}"
+#property version   "1.10"
 #property description "Otomatis mencatat setiap transaksi close dari EA/manual MT5 ke PnL Diary."
 
-input string InpWebhookUrl    = "https://pnl-diary.vercel.app/api/integrations/mt5"; // Webhook URL PnL Diary
-input string InpApiKey        = "";       // API Key dari halaman /profile PnL Diary
-input long   InpMagicFilter   = 0;        // Filter Magic Number (0 = semua EA & manual)
-input bool   InpSendPingOnInit = true;    // Cek koneksi ke server saat EA dipasang
+input string InpWebhookUrl     = "${cleanWebhookUrl}"; // Webhook URL PnL Diary (otomatis terisi)
+input string InpApiKey         = "${cleanApiKey}"; // API Key akun PnL Diary Anda (otomatis terisi)
+input long   InpMagicFilter    = 0;        // Filter Magic Number (0 = semua EA & manual)
+input bool   InpSendPingOnInit = true;     // Cek koneksi ke server saat EA dipasang
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -20,7 +50,7 @@ int OnInit()
 {
    if(StringLen(InpApiKey) < 16)
    {
-      Alert("PnLDiarySync: Isi InpApiKey terlebih dahulu dari halaman /profile di PnL Diary.");
+      Alert("PnLDiarySync: API Key belum terisi. Silakan download ulang EA dari halaman /profile PnL Diary.");
       return(INIT_PARAMETERS_INCORRECT);
    }
 
@@ -34,8 +64,9 @@ int OnInit()
       if(res == -1)
       {
          int err = GetLastError();
-         Print("PnLDiarySync: Gagal koneksi awal (Error ", err, "). Pastikan URL ",
-               InpWebhookUrl, " sudah ditambahkan di Tools -> Options -> Expert Advisors -> Allow WebRequest.");
+         string msg = "PnLDiarySync: Aktifkan WebRequest di MT5 -> Tools -> Options -> Expert Advisors -> Centang 'Allow WebRequest for listed URL' dan tambahkan: ${cleanOrigin}";
+         Alert(msg);
+         Print(msg, " (Error ", err, ")");
       }
       else
       {
@@ -135,7 +166,7 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
                                   (StringLen(cleanComment) > 0 ? " | " + cleanComment : ""));
 
    string payload = StringFormat(
-      "{\"deal_id\":\"%I64u\",\"account_number\":\"%I64d\",\"tanggal\":\"%s\",\"akun\":\"%s\",\"instrumen\":\"%s\",\"arah\":\"%s\",\"entry\":%s,\"exit\":%.5f,\"lot\":%.2f,\"pnl_nominal\":%.2f,\"pnl_persen\":%s,\"catatan\":\"%s\"}",
+      "{\\"deal_id\\":\\"%I64u\\",\\"account_number\\":\\"%I64d\\",\\"tanggal\\":\\"%s\\",\\"akun\\":\\"%s\\",\\"instrumen\\":\\"%s\\",\\"arah\\":\\"%s\\",\\"entry\\":%s,\\"exit\\":%.5f,\\"lot\\":%.2f,\\"pnl_nominal\\":%.2f,\\"pnl_persen\\":%s,\\"catatan\\":\\"%s\\"}",
       dealTicket,
       accNumber,
       dateStr,
@@ -163,8 +194,8 @@ void SendToWebhook(const string jsonBody, const ulong dealTicket)
    if(len > 0)
       ArrayResize(postData, len - 1); // Hapus null-terminator agar JSON valid
 
-   string headers = "Content-Type: application/json\r\n" +
-                    "Authorization: Bearer " + InpApiKey + "\r\n";
+   string headers = "Content-Type: application/json\\r\\n" +
+                    "Authorization: Bearer " + InpApiKey + "\\r\\n";
    char result[];
    string resultHeaders;
 
@@ -187,11 +218,13 @@ void SendToWebhook(const string jsonBody, const ulong dealTicket)
 //+------------------------------------------------------------------+
 string EscapeJson(string text)
 {
-   StringReplace(text, "\\", "\\\\");
-   StringReplace(text, "\"", "\\\"");
-   StringReplace(text, "\r", " ");
-   StringReplace(text, "\n", " ");
+   StringReplace(text, "\\\\", "\\\\\\\\");
+   StringReplace(text, "\\"", "\\\\\\"");
+   StringReplace(text, "\\r", " ");
+   StringReplace(text, "\\n", " ");
    return text;
 }
 //+------------------------------------------------------------------+
+`;
+}
 

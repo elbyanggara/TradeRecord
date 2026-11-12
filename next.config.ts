@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/downloads/PnLDiarySync.mq5",
+        destination: "/api/integrations/mt5/ea",
+      },
+    ];
+  },
   async headers() {
     return [
       {
