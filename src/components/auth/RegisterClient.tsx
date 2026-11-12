@@ -101,15 +101,26 @@ export function RegisterClient({
       title="Buat Akun Baru"
       subtitle="Gratis dan pribadi. Mulai catat PnL harianmu dalam hitungan menit."
       footer={
-        <>
-          Sudah punya akun?{" "}
-          <Link
-            href="/login"
-            className="font-semibold text-[#1E3A8A] hover:underline"
-          >
-            Masuk di sini
-          </Link>
-        </>
+        <div className="space-y-1.5">
+          <div>
+            Sudah punya akun?{" "}
+            <Link
+              href="/login"
+              className="font-semibold text-[#1E3A8A] hover:underline"
+            >
+              Masuk di sini
+            </Link>
+          </div>
+          <div>
+            Pakai EA MT5 tanpa email?{" "}
+            <Link
+              href="/login?mode=mt5"
+              className="font-semibold text-[#1E3A8A] hover:underline"
+            >
+              Masuk / Daftar via Nomor Akun MT5
+            </Link>
+          </div>
+        </div>
       }
     >
       {needsVerification ? (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bot,
   Download,
   LogOut,
   ShieldCheck,
@@ -16,6 +17,10 @@ import { Mt5IntegrationCard } from "@/components/profile/Mt5IntegrationCard";
 import { useToast } from "@/components/ToastProvider";
 import { useJournals } from "@/hooks/useJournals";
 import { downloadJournalsCsv } from "@/lib/csv";
+import {
+  extractMt5AccountFromEmail,
+  formatAccountLabel,
+} from "@/lib/mt5-account";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -23,12 +28,14 @@ interface ProfileClientProps {
   userId: string;
   userEmail: string;
   createdAt?: string;
+  initialSetupMt5?: boolean;
 }
 
 export function ProfileClient({
   userId,
   userEmail,
   createdAt,
+  initialSetupMt5 = false,
 }: ProfileClientProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -37,6 +44,10 @@ export function ProfileClient({
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const mt5Account = extractMt5AccountFromEmail(userEmail);
+  const accountDisplayLabel = formatAccountLabel(userEmail);
+  const showMt5OnboardingBanner = initialSetupMt5;
 
   const joinedLabel = createdAt
     ? new Intl.DateTimeFormat("id-ID", {
@@ -118,9 +129,13 @@ export function ProfileClient({
                 <UserCircle2 className="h-7 w-7" />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#111827]">{userEmail}</p>
+                <p className="text-sm font-bold text-[#111827]">
+                  {accountDisplayLabel}
+                </p>
                 <p className="text-xs text-slate-500">
-                  Bergabung sejak {joinedLabel}
+                  {mt5Account
+                    ? `Mode EA MT5 • Terdaftar sejak ${joinedLabel}`
+                    : `Bergabung sejak ${joinedLabel}`}
                 </p>
               </div>
             </div>
@@ -158,6 +173,21 @@ export function ProfileClient({
         </div>
 
         {/* Auto-Sync MT5 / EA */}
+        {showMt5OnboardingBanner && (
+          <div className="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3.5 text-xs text-blue-950">
+            <Bot className="mt-0.5 h-5 w-5 shrink-0 text-[#1E3A8A]" />
+            <div>
+              <p className="font-bold">
+                Akun {accountDisplayLabel} berhasil dibuat!
+              </p>
+              <p className="mt-0.5 text-blue-900/90">
+                Langkah terakhir: klik tombol{" "}
+                <strong>Buat Key &amp; Download EA (.mq5)</strong> di bawah ini
+                lalu pasang di MetaTrader 5 Anda.
+              </p>
+            </div>
+          </div>
+        )}
         <Mt5IntegrationCard />
 
         {/* PWA Install */}

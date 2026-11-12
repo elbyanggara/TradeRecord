@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useToast } from "@/components/ToastProvider";
+import { formatAccountLabel } from "@/lib/mt5-account";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -110,7 +111,7 @@ export function AppShell({ userEmail, children, onQuickAdd }: AppShellProps) {
               Akun Aktif
             </p>
             <p className="mt-0.5 truncate text-xs font-semibold text-[#111827]">
-              {userEmail}
+              {formatAccountLabel(userEmail)}
             </p>
           </div>
           <button

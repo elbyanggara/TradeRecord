@@ -8,21 +8,33 @@ export const metadata: Metadata = {
   title: "Profil",
 };
 
-async function ProfileServer() {
-  const user = await requireAuthenticatedUser();
+async function ProfileServer({
+  searchParams,
+}: {
+  searchParams: Promise<{ setup?: string }>;
+}) {
+  const [user, resolvedSearchParams] = await Promise.all([
+    requireAuthenticatedUser(),
+    searchParams,
+  ]);
   return (
     <ProfileClient
       userId={user.id}
       userEmail={user.email}
       createdAt={user.createdAt}
+      initialSetupMt5={resolvedSearchParams.setup === "mt5"}
     />
   );
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ setup?: string }>;
+}) {
   return (
     <Suspense fallback={<ProtectedPageFallback />}>
-      <ProfileServer />
+      <ProfileServer searchParams={searchParams} />
     </Suspense>
   );
 }
