@@ -22,9 +22,16 @@ Web & PWA jurnal trading harian yang dibangun dengan **Next.js (App Router)**, *
 2. Isi variabel lingkungan dari **Supabase Dashboard → Project Settings → API**:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Jalankan skema SQL di **Supabase Dashboard → SQL Editor** dari file [`supabase/schema.sql`](supabase/schema.sql) untuk membuat tabel `public.journals`, index, policy RLS `"own_data"`, serta fungsi `delete_own_account()`.
-4. Di **Supabase → Authentication → URL Configuration**, tambahkan URL aplikasi Anda (mis. `http://localhost:3000/auth/callback` dan `https://pnldiary.app/auth/callback`) ke **Redirect URLs**.
-5. Jalankan server pengembangan:
+   - `SUPABASE_SERVICE_ROLE_KEY` (untuk aktivasi webhook pembayaran)
+3. Jalankan skema SQL di **Supabase Dashboard → SQL Editor** dari file [`supabase/schema.sql`](supabase/schema.sql) untuk membuat tabel `public.journals`, `public.integration_tokens`, `public.user_subscriptions`, `public.payment_orders`, policy RLS, dan RPC `ingest_mt5_trade`.
+4. Di **Supabase → Authentication → URL Configuration**, tambahkan URL aplikasi Anda (mis. `http://localhost:3000/auth/callback` dan `https://pnl-diary.vercel.app/auth/callback`) ke **Redirect URLs**.
+5. Konfigurasi Pembayaran Midtrans (untuk langganan MT5 Pro Rp 30.000):
+   - `MIDTRANS_SERVER_KEY`: Server Key dari Midtrans
+   - `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY`: Client Key dari Midtrans
+   - `MIDTRANS_IS_PRODUCTION`: `false` (Sandbox) atau `true` (Production)
+   - Di Midtrans Dashboard (Settings -> Configuration), set Payment Notification URL ke:
+     `https://pnl-diary.vercel.app/api/payments/midtrans/webhook`
+6. Jalankan server pengembangan:
    ```bash
    npm run dev
    ```
