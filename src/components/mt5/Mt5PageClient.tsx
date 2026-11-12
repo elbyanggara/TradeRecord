@@ -294,7 +294,7 @@ export function Mt5PageClient({
                   Akses {sub?.durationDays ?? 30} Hari
                 </p>
                 <p className="font-heading text-2xl font-bold tabular-nums text-[#1E3A8A]">
-                  {formatRupiah(sub?.priceIdr ?? 99000)}
+                  {formatRupiah(sub?.priceIdr ?? 30000)}
                 </p>
               </div>
             </div>
@@ -347,7 +347,7 @@ export function Mt5PageClient({
                 <CreditCard className="h-4 w-4" />
                 {checkingOut
                   ? "Menyiapkan Pembayaran..."
-                  : `Bayar & Aktifkan Pro (${formatRupiah(sub?.priceIdr ?? 99000)})`}
+                  : `Bayar & Aktifkan Pro (${formatRupiah(sub?.priceIdr ?? 30000)})`}
               </button>
             </div>
 

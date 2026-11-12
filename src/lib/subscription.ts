@@ -12,14 +12,17 @@ import {
 import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
+export const DEFAULT_PRO_PLAN_PRICE_IDR = 30000;
 export const PRO_PLAN_DURATION_DAYS = 30;
 
 export function getProPlanPriceIdr(): number {
-  const parsed = Number(process.env.PRO_PLAN_PRICE_IDR ?? 99000);
+  const parsed = Number(
+    process.env.PRO_PLAN_PRICE_IDR ?? DEFAULT_PRO_PLAN_PRICE_IDR
+  );
   if (Number.isFinite(parsed) && parsed >= 1000) {
     return Math.round(parsed);
   }
-  return 99000;
+  return DEFAULT_PRO_PLAN_PRICE_IDR;
 }
 
 export interface ApiSessionContext {
