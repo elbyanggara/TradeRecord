@@ -184,6 +184,15 @@ export async function POST(request: Request) {
             { status: 409 }
           );
         }
+        if (msg.includes("rate limit")) {
+          return NextResponse.json(
+            {
+              error:
+                "Batas pengiriman email Supabase tercapai. Matikan 'Confirm email' di Supabase (Authentication -> Sign In / Providers -> Email) atau tambahkan SUPABASE_SERVICE_ROLE_KEY di Vercel agar pendaftaran akun MT5 langsung aktif tanpa kirim email.",
+            },
+            { status: 429 }
+          );
+        }
         return NextResponse.json(
           { error: signUpError.message },
           { status: 400 }
